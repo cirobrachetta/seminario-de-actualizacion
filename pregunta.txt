@@ -1,0 +1,32 @@
+En base a las siguientes entidades, User y UserController:
+
+class User{
+    private:
+        string UserName;
+        string Password;
+    public:
+        User(string name, string pass) : UserName(name), Password(pass) {}
+        string getUserName();
+        string getPassword();
+        void setUserName(string newName);
+        void setPassword(string newPassword);
+};
+
+class UserController{
+    private:
+        vector<User> users = { {"admin", "admin123"}, {"user1", "password1"}, {"user2", "password2"} };
+    public:
+        int findUserIndex(const string& name);
+        void login(const string& name, const string& password, int& failedAttempts);
+        void Change_Password(const string& username);
+        bool PasswordAuth(const string& password);
+        void ReguisterUser(const string& username, const string& password);
+};
+
+como podria implementar lo requerido en la siguiente consigna de la forma mas eficiente posible?
+consigna: La empresa cliente nos comenta que el negocio está incorporando cada vez más personal
+especializándolo en áreas para mejorar los procesos de organización. Por lo tanto, reorganizará los
+usuarios de sistema en diferentes categorías. (Administradores, Clientes, Vendedores, Trabajadores de
+depósito). Extienda el programa de modo tal que contemple estas categorías de usuario. Cree un usuario
+para cada una a fin de que exista un empleado registrado en cada “puesto”. Cualquier usuario que inicie
+sesión en el sistema deberá tener acceso al menú de acciones principal.
