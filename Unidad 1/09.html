@@ -24,22 +24,37 @@ administrador”.*/
 let authData = new Map();
 const maxLoginFailedAttempts = 3;
 
-let userData =
-[
+let userData = [
 	{
 		password: 'dsaewq321',
 		failedLoginCounter: 0,
-		isLocked: false
+		isLocked: false,
+		rol: 'ADMIN'
 	},
 	{
 		password: '987654',
 		failedLoginCounter: 0,
-		isLocked: false
+		isLocked: false,
+		rol: 'CLIENTE'
+	},
+	{
+		password: 'vent123!!',
+		failedLoginCounter: 0,
+		isLocked: false,
+		rol: 'VENDEDOR'
+	},
+	{
+		password: 'deposito##',
+		failedLoginCounter: 0,
+		isLocked: false,
+		rol: 'DEPOSITO'
 	}
-]
+];
 
-authData.set('ciro', userData[0] );
-authData.set('subZero', userData[1] );
+authData.set('ciro', userData[0]);
+authData.set('clienteUser', userData[1]);
+authData.set('vendedorUser', userData[2]);
+authData.set('depositoUser', userData[3]);
 
 //Articulos
 
@@ -169,7 +184,26 @@ class AdministradorProductos
 		alert("Producto eliminado exitosamente.");
 	}
 }
-const admin = new AdministradorProductos(productos);
+
+class ControladorDeRoles {
+	constructor() {
+		this.permisos = {
+			ADMIN: ["listar", "agregar", "editar", "eliminar", "comprar"],
+			VENDEDOR: ["listar", "agregar", "editar"],
+			CLIENTE: ["listar", "comprar"],
+			DEPOSITO: ["listar"]
+		};
+	}
+
+	tienePermiso(rol, accion) {
+		const accionesPermitidas = this.permisos[rol];
+		return accionesPermitidas?.includes(accion) || false;
+	}
+
+	getAccionesDisponibles(rol) {
+		return this.permisos[rol] || [];
+	}
+}
 
 function isValidUserGetData( username )
 {
@@ -216,8 +250,12 @@ function authenticateUser(username, password)
 		if (userdata) {
 			if (userdata.isLocked === false) {
 				if (userdata.password === password) {
-					api_return.status = true;
-				} else {
+                    api_return.status = true;
+                    api_return.result = {
+                        username: username,
+                        rol: userdata.rol
+                    };
+                } else {
 					userdata.failedLoginCounter++;
 					api_return.status = false;
 					api_return.result = 'USER_PASSWORD_FAILED';
@@ -293,7 +331,7 @@ function GUI_crearCuenta() {
 	}
 }
 
-function GUI_login(admin) {
+function GUI_login() {
 	let username = window.prompt("Ingrese su nombre de usuario:");
 	let password = window.prompt("Ingrese contraseña:");
 
@@ -301,58 +339,76 @@ function GUI_login(admin) {
 
 	if (api_return.status) {
 		alert(`¡Bienvenido/a ${username}!`);
-		showUserMenu(username, admin);
-	}
-	else if ( api_return.status == false )
-	{
-		switch ( api_return.result ) 
-		{
+		// Devolvemos el objeto con username y rol
+		return api_return.result;
+	} else {
+		switch (api_return.result) {
 			case 'BLOCKED_USER':
 				alert('Usuario bloqueado. Contacte al administrador');
-			break;
-
+				break;
 			case 'USER_PASSWORD_FAILED':
 				alert('Usuario y/o contraseña incorrecta');
-			break;
-
+				break;
 			default:
 				alert('Error desconocido');
-			break;
+				break;
 		}
+		return null;
 	}
-
-	return api_return;
 }
 
-function GUI_gestionArticulos() {
+function GUI_gestionArticulos(adminProductos, rol, rolesController) {
 	let salir = false;
 
 	while (!salir) {
-		let opcion = prompt(
-			"Gestión de Artículos:\n" +
-			"1. Listar artículos\n" +
-			"2. Nuevo artículo\n" +
-			"3. Editar artículo\n" +
-			"4. Eliminar artículo\n" +
-			"5. Comprar artículo\n"+
-			"6. Volver al menu anterior"
-		);
+		let menu = "Gestión de Artículos:\n";
+		let opciones = [];
+
+		if (rolesController.tienePermiso(rol, "listar")) {
+			menu += "1. Listar artículos\n";
+			opciones.push("1");
+		}
+		if (rolesController.tienePermiso(rol, "agregar")) {
+			menu += "2. Nuevo artículo\n";
+			opciones.push("2");
+		}
+		if (rolesController.tienePermiso(rol, "editar")) {
+			menu += "3. Editar artículo\n";
+			opciones.push("3");
+		}
+		if (rolesController.tienePermiso(rol, "eliminar")) {
+			menu += "4. Eliminar artículo\n";
+			opciones.push("4");
+		}
+		if (rolesController.tienePermiso(rol, "comprar")) {
+			menu += "5. Comprar artículo\n";
+			opciones.push("5");
+		}
+
+		menu += "6. Volver al menú anterior";
+
+		let opcion = prompt(menu);
 
 		switch (opcion) {
 			case "1":
-				admin.listar();
+				if (rolesController.tienePermiso(rol, "listar")) adminProductos.listar();
+				else alert("No tiene permiso.");
 				break;
 			case "2":
-				admin.agregar();
+				if (rolesController.tienePermiso(rol, "agregar")) adminProductos.agregar();
+				else alert("No tiene permiso.");
 				break;
 			case "3":
-				admin.editar();
+				if (rolesController.tienePermiso(rol, "editar")) adminProductos.editar();
+				else alert("No tiene permiso.");
 				break;
 			case "4":
-				admin.eliminar();
+				if (rolesController.tienePermiso(rol, "eliminar")) adminProductos.eliminar();
+				else alert("No tiene permiso.");
 				break;
 			case "5":
-				admin.comprar();
+				if (rolesController.tienePermiso(rol, "comprar")) adminProductos.comprar();
+				else alert("No tiene permiso.");
 				break;
 			case "6":
 				salir = true;
@@ -363,20 +419,25 @@ function GUI_gestionArticulos() {
 	}
 }
 
-function showUserMenu(username, admin) {
+function showUserMenu(username, rol, adminProductos, rolesController) {
 	let option;
 	let repeat = true;
 
 	while (repeat) {
-		option = window.prompt(
-			"Seleccione una opción:\n" +
-			"1. Cambiar contraseña\n" +
-			"2. Gestión de artículos\n" +
-			"3. Salir"
-		);
+		let menu = `[${rol}] Seleccione una opción:\n1. Cambiar contraseña\n`;
+
+		menu += "2. Menú de artículos\n";
+
+		if (rolesController.tienePermiso(rol, "comprar")) {
+			menu += "3. Comprar artículo\n";
+		}
+
+		menu += "4. Salir";
+
+		option = window.prompt(menu);
 
 		switch (option) {
-			case "1":
+			case '1':
 				let newPassword = window.prompt("Ingrese nueva contraseña:");
 				if (isStrongPassword(newPassword)) {
 					let user = authData.get(username);
@@ -387,11 +448,19 @@ function showUserMenu(username, admin) {
 				}
 				break;
 
-			case "2":
-				GUI_gestionArticulos(admin);
+			case '2':
+				GUI_gestionArticulos(adminProductos, rol, rolesController);
 				break;
 
-			case "3":
+			case '3':
+				if (rolesController.tienePermiso(rol, "comprar")) {
+					adminProductos.comprar();
+				} else {
+					alert("No tiene permiso para comprar.");
+				}
+				break;
+
+			case '4':
 				alert("Saliendo al inicio...");
 				repeat = false;
 				break;
@@ -405,20 +474,17 @@ function showUserMenu(username, admin) {
 function main() {
 	let exit = false;
 	const admin = new AdministradorProductos(productos);
+	const rolesController = new ControladorDeRoles();
 
 	while (!exit) {
 		const option = prompt("Seleccione una opción:\n1. Iniciar sesión\n2. Crear cuenta\n3. Salir");
 
 		switch (option?.toUpperCase()) {
 			case "1":
-				let attempts = 0;
-				let api_return = GUI_login(admin);
-
-				while (api_return.result === 'USER_PASSWORD_FAILED' && attempts < maxLoginFailedAttempts) {
-					attempts++;
-					api_return = GUI_login(admin);
+				let loginResult = GUI_login();
+				if (loginResult) {
+					showUserMenu(loginResult.username, loginResult.rol, admin, rolesController);
 				}
-
 				break;
 
 			case "2":
