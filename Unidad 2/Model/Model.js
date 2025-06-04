@@ -221,7 +221,7 @@ export class ControladorDeRoles {
 	}
 }
 
-class ApplicationModel {
+export class ApplicationModel {
 	constructor() {
 		this.usuarios = new ControladorUsuarios();
 		this.roles = new ControladorDeRoles();
@@ -241,23 +241,3 @@ class ApplicationModel {
 		return this.roles;
 	}
 }
-
-// API para GUI.js
-function isStrongPassword(password, model) {
-	return model.usuarios.isStrongPassword(password);
-}
-
-function authenticateUser(username, password, model) {
-	return model.usuarios.authenticate(username, password);
-}
-
-function api_crearCuenta(username, password, model) {
-	return model.usuarios.crearCuenta(username, password);
-}
-
-export {
-	ApplicationModel,
-	isStrongPassword,
-	authenticateUser,
-	api_crearCuenta
-};
