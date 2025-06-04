@@ -1,6 +1,6 @@
 // Model.js
 
-export class ControladorUsuarios {
+export class UserABMmodel {
 	constructor() {
 		this.usuarios = new Map();
 		this.maxLoginFailedAttempts = 3;
@@ -65,13 +65,8 @@ export class ControladorUsuarios {
 		if (this.usuarios.has(username)) return { status: "USER_EXISTS" };
 		if (!this.isStrongPassword(password)) return { status: "WEAK_PASSWORD" };
 
-		this.usuarios.set(username, { password, failedLoginCounter: 0, isLocked: false });
+		this.usuarios.set(username, { password, failedLoginCounter: 0, isLocked: false, rol: "CLIENTE" });
 		return { status: "OK" };
-	}
-
-	actualizarPassword(username, password) {
-		let user = this.usuarios.get(username);
-		if (user) user.password = password;
 	}
 
 	hasUser(username) {
@@ -79,11 +74,10 @@ export class ControladorUsuarios {
 	}
 
 	updatePassword(username, newPassword) {
-		if (this.usuarios.has(username)) {
-			this.usuarios.get(username).password = newPassword;
-			return true;
-		}
-		return false;
+		if (!this.usuarios.has(username)) return false;
+		if (!this.isStrongPassword(newPassword)) return false;
+		this.usuarios.get(username).password = newPassword;
+		return true;
 	}
 
 	deleteUser(username) {
@@ -100,7 +94,7 @@ export class ControladorUsuarios {
 	}
 }
 
-export class AdministradorProductos {
+export class ProductABMmodel {
 	constructor(productos) {
 		this.productos = productos;
 	}
@@ -122,10 +116,8 @@ export class AdministradorProductos {
 
 	comprar(id, cantidad) {
 		if (!this.productos.has(id)) throw new Error("NOT_FOUND");
-
 		let producto = this.productos.get(id);
 		if (producto.stock < cantidad) throw new Error("INSUFFICIENT_STOCK");
-
 		producto.stock -= cantidad;
 		this.productos.set(id, producto);
 		return producto;
@@ -140,69 +132,9 @@ export class AdministradorProductos {
 		if (!this.productos.has(id)) throw new Error("NOT_FOUND");
 		this.productos.delete(id);
 	}
-
-	mostrar() {
-		let salida = "Lista de productos:\n";
-		for (let [id, prod] of this.productos.entries()) {
-			salida += `ID: ${id} | ${prod.nombre} - $${prod.precio} - Stock: ${prod.stock}\n`;
-		}
-		alert(salida);
-	}
-
-	nuevoArticulo() {
-		const nombre = prompt("Nombre del producto:");
-		const precio = parseFloat(prompt("Precio:"));
-		const stock = parseInt(prompt("Stock inicial:"));
-
-		if (nombre && !isNaN(precio) && !isNaN(stock)) {
-			this.agregar(nombre, precio, stock);
-			alert("Producto agregado con éxito.");
-		} else {
-			alert("Datos inválidos.");
-		}
-	}
-
-	editarArticulo() {
-		const id = parseInt(prompt("ID del producto a editar:"));
-		if (!this.productos.has(id)) return alert("Producto no encontrado.");
-
-		const nombre = prompt("Nuevo nombre:");
-		const precio = parseFloat(prompt("Nuevo precio:"));
-		const stock = parseInt(prompt("Nuevo stock:"));
-
-		if (!nombre || isNaN(precio) || isNaN(stock)) {
-			alert("Datos inválidos.");
-			return;
-		}
-
-		this.editar(id, nombre, precio, stock);
-		alert("Producto actualizado.");
-	}
-
-	eliminarArticulo() {
-		const id = parseInt(prompt("ID del producto a eliminar:"));
-		if (this.productos.has(id)) {
-			this.eliminar(id);
-			alert("Producto eliminado.");
-		} else {
-			alert("Producto no encontrado.");
-		}
-	}
-
-	comprarArticulo() {
-		const id = parseInt(prompt("ID del producto a comprar:"));
-		const cantidad = parseInt(prompt("Cantidad:"));
-
-		try {
-			const producto = this.comprar(id, cantidad);
-			alert(`Compra realizada. Quedan ${producto.stock} unidades de ${producto.nombre}`);
-		} catch (err) {
-			alert(err.message === "INSUFFICIENT_STOCK" ? "Stock insuficiente" : "Producto no encontrado");
-		}
-	}
 }
 
-export class ControladorDeRoles {
+export class RolABMmodel {
 	constructor() {
 		this.permisos = {
 			ADMIN: ["listar", "agregar", "editar", "eliminar", "comprar"],
@@ -223,14 +155,14 @@ export class ControladorDeRoles {
 
 export class ApplicationModel {
 	constructor() {
-		this.usuarios = new ControladorUsuarios();
-		this.roles = new ControladorDeRoles();
+		this.usuarios = new UserABMmodel();
+		this.roles = new RolABMmodel();
 		this.productos = new Map([
 			[1, { nombre: "Lavandina x 1L", precio: 875.25, stock: 3000 }],
 			[4, { nombre: "Detergente x 500mL", precio: 1102.45, stock: 2010 }],
 			[22, { nombre: "Jabón en polvo x 250g", precio: 650.22, stock: 407 }],
 		]);
-		this.adminProductos = new AdministradorProductos(this.productos);
+		this.adminProductos = new ProductABMmodel(this.productos);
 	}
 
 	createProductoController() {
