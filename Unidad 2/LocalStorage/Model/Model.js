@@ -4,7 +4,7 @@ export class UserABMmodel {
 	constructor() {
 		this.usuarios = new Map();
 		this.maxLoginFailedAttempts = 3;
-		this.initDefaultUsers();
+		this.loadFromStorage();
 	}
 
 	initDefaultUsers() {
@@ -12,6 +12,21 @@ export class UserABMmodel {
 		this.usuarios.set("clienteUser", { password: "987654", failedLoginCounter: 0, isLocked: false, rol: "CLIENTE" });
 		this.usuarios.set("vendedorUser", { password: "vent123!!", failedLoginCounter: 0, isLocked: false, rol: "VENDEDOR" });
 		this.usuarios.set("depositoUser", { password: "deposito##", failedLoginCounter: 0, isLocked: false, rol: "DEPOSITO" });
+	}
+
+	saveToStorage() {
+		const usuariosObj = Object.fromEntries(this.usuarios);
+		localStorage.setItem('usuarios', JSON.stringify(usuariosObj));
+	}
+
+	loadFromStorage() {
+		const data = localStorage.getItem('usuarios');
+		if (data) {
+			this.usuarios = new Map(Object.entries(JSON.parse(data)));
+		} else {
+			this.initDefaultUsers();
+			this.saveToStorage();
+		}
 	}
 
 	isStrongPassword(password) {
@@ -57,6 +72,7 @@ export class UserABMmodel {
 			}
 		}
 
+		this.saveToStorage();
 		return result;
 	}
 
@@ -66,6 +82,7 @@ export class UserABMmodel {
 		if (!this.isStrongPassword(password)) return { status: "WEAK_PASSWORD" };
 
 		this.usuarios.set(username, { password, failedLoginCounter: 0, isLocked: false, rol: "CLIENTE" });
+		this.saveToStorage();
 		return { status: "OK" };
 	}
 
@@ -77,11 +94,14 @@ export class UserABMmodel {
 		if (!this.usuarios.has(username)) return false;
 		if (!this.isStrongPassword(newPassword)) return false;
 		this.usuarios.get(username).password = newPassword;
+		this.saveToStorage();
 		return true;
 	}
 
 	deleteUser(username) {
-		return this.usuarios.delete(username);
+		const result = this.usuarios.delete(username);
+		this.saveToStorage();
+		return result;
 	}
 
 	listUsers() {
@@ -97,6 +117,19 @@ export class UserABMmodel {
 export class ProductABMmodel {
 	constructor(productos) {
 		this.productos = productos;
+		this.loadFromStorage();
+	}
+
+	saveToStorage() {
+		const productosObj = Object.fromEntries(this.productos);
+		localStorage.setItem('productos', JSON.stringify(productosObj));
+	}
+
+	loadFromStorage() {
+		const data = localStorage.getItem('productos');
+		if (data) {
+			this.productos = new Map(Object.entries(JSON.parse(data)).map(([id, val]) => [parseInt(id), val]));
+		}
 	}
 
 	listar() {
@@ -111,6 +144,7 @@ export class ProductABMmodel {
 	agregar(nombre, precio, stock) {
 		const id = this.getNextId();
 		this.productos.set(id, { nombre, precio, stock });
+		this.saveToStorage();
 		return id;
 	}
 
@@ -120,17 +154,20 @@ export class ProductABMmodel {
 		if (producto.stock < cantidad) throw new Error("INSUFFICIENT_STOCK");
 		producto.stock -= cantidad;
 		this.productos.set(id, producto);
+		this.saveToStorage();
 		return producto;
 	}
 
 	editar(id, nombre, precio, stock) {
 		if (!this.productos.has(id)) throw new Error("NOT_FOUND");
 		this.productos.set(id, { nombre, precio, stock });
+		this.saveToStorage();
 	}
 
 	eliminar(id) {
 		if (!this.productos.has(id)) throw new Error("NOT_FOUND");
 		this.productos.delete(id);
+		this.saveToStorage();
 	}
 }
 
