@@ -1,12 +1,25 @@
 Model (backend):
 
 // Model.js
+import { PersistenceManager } from "./PersistenceManager.js";
+
+const persistence = new PersistenceManager();
 
 export class UserABMmodel {
-	constructor() {
+	constructor(persistCallback) {
 		this.usuarios = new Map();
 		this.maxLoginFailedAttempts = 3;
-		this.initDefaultUsers();
+		this.persist = persistCallback;
+	}
+
+	async init() {
+		const data = await persistence.load("usuarios");
+		if (data) {
+			this.usuarios = new Map(JSON.parse(data));
+		} else {
+			this.initDefaultUsers();
+			this.persist();
+		}
 	}
 
 	initDefaultUsers() {
@@ -14,6 +27,10 @@ export class UserABMmodel {
 		this.usuarios.set("clienteUser", { password: "987654", failedLoginCounter: 0, isLocked: false, rol: "CLIENTE" });
 		this.usuarios.set("vendedorUser", { password: "vent123!!", failedLoginCounter: 0, isLocked: false, rol: "VENDEDOR" });
 		this.usuarios.set("depositoUser", { password: "deposito##", failedLoginCounter: 0, isLocked: false, rol: "DEPOSITO" });
+	}
+
+	toJSON() {
+		return JSON.stringify([...this.usuarios.entries()]);
 	}
 
 	isStrongPassword(password) {
@@ -28,27 +45,15 @@ export class UserABMmodel {
 
 	authenticate(username, password) {
 		let result = { status: false, result: null };
-
-		if (!username || !password) {
-			result.result = "USER_PASSWORD_FAILED";
-			return result;
-		}
-
+		if (!username || !password) return { result: "USER_PASSWORD_FAILED" };
 		const user = this.usuarios.get(username);
-		if (!user) {
-			result.result = "USER_PASSWORD_FAILED";
-			return result;
-		}
-
-		if (user.isLocked) {
-			result.result = "BLOCKED_USER";
-			return result;
-		}
+		if (!user) return { result: "USER_PASSWORD_FAILED" };
+		if (user.isLocked) return { result: "BLOCKED_USER" };
 
 		if (user.password === password) {
+			user.failedLoginCounter = 0;
 			result.status = true;
 			result.result = { username, rol: user.rol };
-			user.failedLoginCounter = 0;
 		} else {
 			user.failedLoginCounter++;
 			if (user.failedLoginCounter >= this.maxLoginFailedAttempts) {
@@ -59,6 +64,7 @@ export class UserABMmodel {
 			}
 		}
 
+		this.persist();
 		return result;
 	}
 
@@ -68,22 +74,22 @@ export class UserABMmodel {
 		if (!this.isStrongPassword(password)) return { status: "WEAK_PASSWORD" };
 
 		this.usuarios.set(username, { password, failedLoginCounter: 0, isLocked: false, rol: "CLIENTE" });
+		this.persist();
 		return { status: "OK" };
-	}
-
-	hasUser(username) {
-		return this.usuarios.has(username);
 	}
 
 	updatePassword(username, newPassword) {
 		if (!this.usuarios.has(username)) return false;
 		if (!this.isStrongPassword(newPassword)) return false;
 		this.usuarios.get(username).password = newPassword;
+		this.persist();
 		return true;
 	}
 
 	deleteUser(username) {
-		return this.usuarios.delete(username);
+		const result = this.usuarios.delete(username);
+		this.persist();
+		return result;
 	}
 
 	listUsers() {
@@ -97,8 +103,9 @@ export class UserABMmodel {
 }
 
 export class ProductABMmodel {
-	constructor(productos) {
+	constructor(productos, persistCallback) {
 		this.productos = productos;
+		this.persist = persistCallback;
 	}
 
 	listar() {
@@ -113,6 +120,7 @@ export class ProductABMmodel {
 	agregar(nombre, precio, stock) {
 		const id = this.getNextId();
 		this.productos.set(id, { nombre, precio, stock });
+		this.persist();
 		return id;
 	}
 
@@ -122,17 +130,20 @@ export class ProductABMmodel {
 		if (producto.stock < cantidad) throw new Error("INSUFFICIENT_STOCK");
 		producto.stock -= cantidad;
 		this.productos.set(id, producto);
+		this.persist();
 		return producto;
 	}
 
 	editar(id, nombre, precio, stock) {
 		if (!this.productos.has(id)) throw new Error("NOT_FOUND");
 		this.productos.set(id, { nombre, precio, stock });
+		this.persist();
 	}
 
 	eliminar(id) {
 		if (!this.productos.has(id)) throw new Error("NOT_FOUND");
 		this.productos.delete(id);
+		this.persist();
 	}
 }
 
@@ -157,14 +168,32 @@ export class RolABMmodel {
 
 export class ApplicationModel {
 	constructor() {
-		this.usuarios = new UserABMmodel();
+		this.productos = new Map();
 		this.roles = new RolABMmodel();
-		this.productos = new Map([
-			[1, { nombre: "Lavandina x 1L", precio: 875.25, stock: 3000 }],
-			[4, { nombre: "Detergente x 500mL", precio: 1102.45, stock: 2010 }],
-			[22, { nombre: "Jabón en polvo x 250g", precio: 650.22, stock: 407 }],
-		]);
-		this.adminProductos = new ProductABMmodel(this.productos);
+
+		this.persistUsuarios = () => persistence.save("usuarios", this.usuarios.toJSON());
+		this.persistProductos = () => persistence.save("productos", JSON.stringify([...this.productos.entries()]));
+
+		this.usuarios = new UserABMmodel(this.persistUsuarios);
+		this.adminProductos = new ProductABMmodel(this.productos, this.persistProductos);
+	}
+
+	async init() {
+		await this.usuarios.init();
+		const productos = await persistence.load("productos");
+		if (productos) {
+			this.productos = new Map(JSON.parse(productos));
+			this.adminProductos.productos = this.productos;
+		} else {
+			this.loadDefaultProducts();
+			this.persistProductos();
+		}
+	}
+
+	loadDefaultProducts() {
+		this.productos.set(1, { nombre: "Lavandina x 1L", precio: 875.25, stock: 3000 });
+		this.productos.set(4, { nombre: "Detergente x 500mL", precio: 1102.45, stock: 2010 });
+		this.productos.set(22, { nombre: "Jabón en polvo x 250g", precio: 650.22, stock: 407 });
 	}
 
 	createProductoController() {
@@ -175,6 +204,7 @@ export class ApplicationModel {
 		return this.roles;
 	}
 }
+
 
 GUI(frontend):
 
@@ -487,18 +517,88 @@ class ApplicationUI {
 
 export { ApplicationUI };
 
+PersistenceManager:
+
+// PersistenceManager.js
+
+export class PersistenceManager {
+	constructor(dbName = 'AppDB', storeName = 'AppStore') {
+		this.dbName = dbName;
+		this.storeName = storeName;
+	}
+
+	openDB() {
+		return new Promise((resolve, reject) => {
+			const request = indexedDB.open(this.dbName, 2);
+			request.onupgradeneeded = (e) => {
+				const db = e.target.result;
+				if (!db.objectStoreNames.contains('usuarios')) {
+					db.createObjectStore('usuarios');
+				}
+				if (!db.objectStoreNames.contains('productos')) {
+					db.createObjectStore('productos');
+				}
+			};
+			request.onsuccess = () => resolve(request.result);
+			request.onerror = () => reject(request.error);
+		});
+	}
+
+	async save(key, data) {
+		const db = await this.openDB();
+		const tx = db.transaction(this.storeName, "readwrite");
+		const store = tx.objectStore(this.storeName);
+		store.put(data, key);
+		return new Promise((resolve, reject) => {
+			tx.oncomplete = () => {
+				db.close();
+				resolve();
+			};
+			tx.onerror = () => {
+				db.close();
+				reject(tx.error);
+			};
+		});
+	}
+
+	async load(key) {
+		const db = await this.openDB();
+		const tx = db.transaction(this.storeName, "readonly");
+		const store = tx.objectStore(this.storeName);
+		const request = store.get(key);
+
+		return new Promise((resolve) => {
+			request.onsuccess = () => {
+				db.close();
+				resolve(request.result ?? null);
+			};
+			request.onerror = () => {
+				db.close();
+				resolve(null);
+			};
+		});
+	}
+}
+
+
 main.js:
 
-import { ApplicationUI } from "./GUI/GUI.js";
+import { PersistenceManager } from "./Model/PersistenceManager.js";
 import { ApplicationModel } from "./Model/Model.js";
+import { ApplicationUI } from "./GUI/GUI.js"; // Asumiendo que tu GUI está ahí
 
-function main() {
-	const model = new ApplicationModel(); // Usa la clase que encapsula todos los controladores
+async function main() {
+	const persistence = new PersistenceManager();
+
+	const model = new ApplicationModel(persistence);
+	await model.init();
+
 	const app = new ApplicationUI(model);
 	app.run();
 }
 
 main();
+
 
 index.html:
 
@@ -514,4 +614,8 @@ index.html:
 </html>
 
 
-En base a este proyecto agregar manejo de persistencia empleando la API de WebStorage y usando localstorage.
+Uncaught (in promise) NotFoundError: Failed to execute 'transaction' on 'IDBDatabase': One of the specified object stores was not found.
+    at PersistenceManager.load (PersistenceManager.js:45:17)
+    at async UserABMmodel.init (Model.js:14:16)
+    at async ApplicationModel.init (Model.js:180:3)
+    at async main (main.js:9:2)
