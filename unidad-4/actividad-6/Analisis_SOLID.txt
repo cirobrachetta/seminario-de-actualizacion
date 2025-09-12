@@ -1,0 +1,26 @@
+La arquitectura propuesta en este proyecto, respeta los principios SOLID que son relevantes a los requerimientos de la actividad.
+
+-Single Responsability:
+
+ApiService.js: tiene una sola responsabilidad: comunicarse con el servidor (fetch o XHR).
+
+ModalDialog.js: se encarga exclusivamente de gestionar la UI del modal.
+
+RequestUsersComponent.js: se encarga de la lógica de interacción del usuario y renderizado de tabla.
+
+-Open/Closed:
+
+La arquitectura propuesta permite la agregacion de modulos que permitan la extencion del sistema al incluir nuevas funcionalidades.
+Sin necesidad de ccambios profundos en ningun componente existente.
+
+-Dependency Inversion:
+
+Aplicado parcialmente:
+
+Los WebComponents dependen de abstracciones (ApiService) y no de detalles concretos de fetch o XMLHttpRequest.
+Esto permite reemplazar la implementación (ej: un MockApiService para pruebas) sin romper los componentes.
+
+Posible mejora:
+
+Crear una factoría de servicios (ApiServiceFactory) que devuelva la implementación adecuada (XHRService, FetchService, MockService).
+Con esto, los componentes no tendrían que saber cómo se obtienen los datos, solo recibirían una instancia del servicio correcto.
